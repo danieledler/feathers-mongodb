@@ -24,8 +24,13 @@ describe('Feathers MongoDB Service', () => {
           Model: db.collection('people-customid'),
           id: 'customid',
           events: [ 'testing' ]
+        })).use('/people-stringid', service({
+          Model: db.collection('people-stringid'),
+          events: [ 'testing' ],
+          useStringId: true
         }));
 
+        db.collection('people-stringid').removeMany();
         db.collection('people-customid').removeMany();
         db.collection('people').removeMany();
         db.collection('todos').removeMany();
@@ -40,6 +45,7 @@ describe('Feathers MongoDB Service', () => {
 
   base(app, errors, 'people', '_id');
   base(app, errors, 'people-customid', 'customid');
+  base(app, errors, 'people-stringid', '_id');
 
   describe('Initialization', () => {
     describe('when missing options', () => {
@@ -75,6 +81,13 @@ describe('Feathers MongoDB Service', () => {
         let result = service({ Model: db })._objectifyId(id.toString(), '_id');
         expect(result).to.not.be.instanceof(ObjectID);
         expect(result).to.deep.equal(id);
+      });
+
+      it('returns a ObjectID string for a valid ID when useStringId', () => {
+        let id = new ObjectID();
+        let result = service({ Model: db, useStringId: true })._objectifyId(id.toString(), '_id');
+        expect(result).to.be.a('string');
+        expect(result).to.deep.equal(id.toHexString());
       });
     });
 
@@ -122,6 +135,47 @@ describe('Feathers MongoDB Service', () => {
         expect(result).to.be.an('object');
         expect(result).to.deep.equal(mongoFields);
       });
+    });
+  });
+
+  describe('useStringId', () => {
+    let peopleService;
+
+    beforeEach(() => {
+      peopleService = app.service('/people-stringid');
+
+      return peopleService.remove(null, {}).then(() => {
+        return peopleService.create([
+          {name: 'AAA'},
+          {name: 'aaa'},
+          {name: 'ccc'}
+        ]);
+      });
+    });
+
+    it('should have generated string ids', () => {
+      return peopleService.find().then((r) => {
+        expect(r).to.have.lengthOf(3);
+        expect(r[0]._id).to.be.a('string');
+        expect(ObjectID.isValid(r[0]._id), 'valid ObjectID string').to.deep.equal(true);
+      });
+    });
+
+    it('should not coerce the id field to an objectId in find', () => {
+      const id = ObjectID().toHexString();
+      return peopleService
+        .create({ name: 'Do not coerce id', _id: id })
+        .then(r => {
+          return peopleService.find({
+            query: {
+              _id: id
+            }
+          });
+        })
+        .then(r => {
+          expect(r).to.have.lengthOf(1);
+          expect(r[0]._id).to.deep.equal(id);
+        });
     });
   });
 
