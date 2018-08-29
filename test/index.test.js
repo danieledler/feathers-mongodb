@@ -162,6 +162,19 @@ describe('Feathers MongoDB Service', () => {
       });
     });
 
+    it('should not coerce the id field to an objectId in get', () => {
+      const id = ObjectID().toHexString();
+      return peopleService
+        .create({ name: 'Do not coerce id', _id: id })
+        .then(() => {
+          return peopleService.get(id);
+        })
+        .then(r => {
+          expect(r).to.be.an('object');
+          expect(r._id).to.deep.equal(id);
+        });
+    });
+
     it('should not coerce the id field to an objectId in find', () => {
       const id = ObjectID().toHexString();
       return peopleService
